@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: sociala_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sociala
+      POSTGRES_PASSWORD: sociala_password
+      POSTGRES_DB: sociala_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - sociala_pgdata:/var/lib/postgresql/data
+
+volumes:
+  sociala_pgdata:
