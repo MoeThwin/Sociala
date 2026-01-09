@@ -17,11 +17,11 @@ export async function getFeed(accessToken: string) {
   });
 }
 
-export async function createPost(accessToken: string, content: string) {
+export async function createPost(accessToken: string, content: string, imageUrl?: string) {
   return api<{ post: Post }>("/posts", {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, imageUrl }),
   });
 }
 
@@ -31,3 +31,4 @@ export async function toggleLike(accessToken: string, postId: string) {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 }
+

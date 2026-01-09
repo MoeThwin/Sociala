@@ -7,7 +7,7 @@ const router = Router();
 
 const createPostSchema = z.object({
   content: z.string().min(1).max(500),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().min(1).optional(),
 });
 
 router.post("/", requireAuth, async (req: AuthedRequest, res) => {

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import * as postsApi from "../lib/postsApi";
+import { uploadImage } from "../lib/uploadsApi";
+import Comments from "../components/Comments";
 
 export default function HomePage() {
   const { user, logout, accessToken } = useAuth();
@@ -8,6 +10,8 @@ export default function HomePage() {
   const [content, setContent] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   async function loadFeed() {
     if (!accessToken) return;
@@ -20,15 +24,36 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
+  // cleanup preview blob url (prevents memory leaks)
+  useEffect(() => {
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
   async function onCreate() {
     if (!accessToken) return;
-    if (!content.trim()) return;
+    if (!content.trim() && !imageFile) return;
 
     setBusy(true);
     setErr(null);
+
     try {
-      await postsApi.createPost(accessToken, content.trim());
+      let imageUrl: string | undefined;
+
+      if (imageFile) {
+        const up = await uploadImage(accessToken, imageFile);
+        imageUrl = up.url; // "/uploads/xxxx.png"
+      }
+
+      await postsApi.createPost(accessToken, content.trim() || "(image)", imageUrl);
+
       setContent("");
+
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setImageFile(null);
+      setImagePreview(null);
+
       await loadFeed();
     } catch (e: any) {
       setErr(e.message || "Failed to post");
@@ -106,11 +131,50 @@ export default function HomePage() {
           rows={3}
           style={{ width: "100%", padding: 10, resize: "vertical" }}
         />
+
+        {/* Image picker */}
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={(e) => {
+            const f = e.target.files?.[0] || null;
+
+            // clear old preview url
+            if (imagePreview) URL.revokeObjectURL(imagePreview);
+
+            setImageFile(f);
+            setImagePreview(f ? URL.createObjectURL(f) : null);
+          }}
+          style={{ marginTop: 10 }}
+        />
+
+        {/* Preview + remove */}
+        {imagePreview && (
+          <div style={{ marginTop: 10 }}>
+            <img
+              src={imagePreview}
+              alt="preview"
+              style={{ maxWidth: "100%", borderRadius: 10, border: "1px solid #ddd" }}
+            />
+            <button
+              onClick={() => {
+                if (imagePreview) URL.revokeObjectURL(imagePreview);
+                setImageFile(null);
+                setImagePreview(null);
+              }}
+              style={{ marginTop: 8, padding: 8 }}
+            >
+              Remove image
+            </button>
+          </div>
+        )}
+
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
           <button disabled={busy} onClick={onCreate} style={{ padding: "10px 14px" }}>
             {busy ? "Posting..." : "Post"}
           </button>
         </div>
+
         {err && <p style={{ color: "crimson" }}>{err}</p>}
       </div>
 
@@ -131,6 +195,20 @@ export default function HomePage() {
 
               <p style={{ marginTop: 8 }}>{p.content}</p>
 
+              {/* Show uploaded image */}
+              {p.imageUrl && (
+                <img
+                  src={`${import.meta.env.VITE_API_BASE_URL}${p.imageUrl}`}
+                  alt="post"
+                  style={{
+                    width: "100%",
+                    marginTop: 10,
+                    borderRadius: 10,
+                    border: "1px solid #ddd",
+                  }}
+                />
+              )}
+
               <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8 }}>
                 <button
                   onClick={() => onToggleLike(p.id)}
@@ -147,6 +225,8 @@ export default function HomePage() {
 
                 <span style={{ opacity: 0.8, fontSize: 12 }}>💬 {p._count.comments}</span>
               </div>
+
+              <Comments postId={p.id} />
             </div>
           ))}
         </div>
