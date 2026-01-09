@@ -7,7 +7,8 @@ import { requireAuth, AuthedRequest } from "../auth/requireAuth";
 const router = Router();
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, "uploads"),
+  destination: (_req, _file, cb) =>
+    cb(null, path.join(process.cwd(), "uploads")),
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const name = crypto.randomBytes(16).toString("hex");
@@ -33,12 +34,16 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
-router.post("/", requireAuth, upload.single("image"), (req: AuthedRequest, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+router.post("/", requireAuth, (req: AuthedRequest, res) => {
+  upload.single("image")(req as any, res as any, (err: any) => {
+    if (err) {
+      // Multer errors (file too big, wrong type, etc.)
+      return res.status(400).json({ error: err.message || "Upload failed" });
+    }
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-  // This is the URL your frontend will store in Post.imageUrl
-  const url = `/uploads/${req.file.filename}`;
-  return res.status(201).json({ url });
+    const url = `/uploads/${req.file.filename}`;
+    return res.status(201).json({ url });
+  });
 });
-
 export default router;
